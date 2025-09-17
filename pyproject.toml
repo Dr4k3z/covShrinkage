@@ -1,0 +1,42 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "covShrinkage"          
+version = "0.1.0"
+description = "..."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+dependencies = []
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/covShrinkage"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+lint.extend-select = ["E", "F", "I", "UP", "B"]
+lint.ignore = ["E501"]
+lint.fixable = ["ALL"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.ruff.lint.isort]
+known-first-party = ["covShrinkage"]
+
+[tool.mypy]
+strict = true
+ignore_missing_imports = true
+disallow_untyped_defs = true
+disallow_any_unimported = true
+no_implicit_optional = true
+warn_unused_ignores = true
+warn_return_any = true
+warn_redundant_casts = true
+warn_unused_configs = true
+check_untyped_defs = true
+mypy_path = ["src"]
+python_executable = ".venv/bin/python"

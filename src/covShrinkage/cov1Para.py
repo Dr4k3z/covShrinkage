@@ -1,10 +1,8 @@
-# -*- coding: utf-8 -*-
 """
 Created on Thu Jul  8 20:21:58 2021
 
 @author: Patrick Ledoit
 """
-
 
 
 # function sigmahat=cov1Para(Y,k)
@@ -26,6 +24,7 @@ Created on Thu Jul  8 20:21:58 2021
 
 ###########################################################################
 # This file is released under the BSD 2-clause license.
+
 
 # Copyright (c) 2014-2021, Olivier Ledoit and Michael Wolf
 # All rights reserved.
@@ -53,77 +52,64 @@ Created on Thu Jul  8 20:21:58 2021
 # NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ###########################################################################
-def cov1Para(Y,k = None):
-    
-    #Pre-Conditions: Y is a valid pd.dataframe and optional arg- k which can be
+
+import math
+
+import numpy as np
+import pandas as pd
+
+
+def cov1Para(Y: pd.DataFrame, k: int | None = None) -> pd.DataFrame:
+    """
+    Pre-Conditions: Y is a valid pd.dataframe and optional arg- k which can be
     #    None, np.nan or int
-    #Post-Condition: Sigmahat dataframe is returned
-    
-    import numpy as np
-    import pandas as pd
-    import math
+    # Post-Condition: Sigmahat dataframe is returned
+    """
 
     # de-mean returns if required
-    N,p = Y.shape                      # sample size and matrix dimension
-   
-   
-    #default setting
+    N, p = Y.shape  # sample size and matrix dimension
+
+    # default setting
     if k is None or math.isnan(k):
-        
         mean = Y.mean(axis=0)
-        Y = Y.sub(mean, axis=1)                               #demean
+        Y = Y.sub(mean, axis=1)  # demean
         k = 1
 
-    #vars
-    n = N-k                                    # adjust effective sample size
-    
-    
-    #Cov df: sample covariance matrix
-    sample = pd.DataFrame(np.matmul(Y.T.to_numpy(),Y.to_numpy()))/n     
-    
-    
+    # vars
+    n = N - k  # adjust effective sample size
+
+    # Cov df: sample covariance matrix
+    sample: pd.DataFrame = pd.DataFrame(np.matmul(Y.T.to_numpy(), Y.to_numpy())) / n
+
     # compute shrinkage target
     diag = np.diag(sample.to_numpy())
-    meanvar= sum(diag)/len(diag)
-    target=meanvar*np.eye(p)
-    
-    
-    
+    meanvar = sum(diag) / len(diag)
+    target = meanvar * np.eye(p)
+
     # estimate the parameter that we call pi in Ledoit and Wolf (2003, JEF)
-    Y2 = pd.DataFrame(np.multiply(Y.to_numpy(),Y.to_numpy()))
-    sample2= pd.DataFrame(np.matmul(Y2.T.to_numpy(),Y2.to_numpy()))/n     # sample covariance matrix of squared returns
-    piMat=pd.DataFrame(sample2.to_numpy()-np.multiply(sample.to_numpy(),sample.to_numpy()))
-    
-    
+    Y2: pd.DataFrame = pd.DataFrame(np.multiply(Y.to_numpy(), Y.to_numpy()))
+    sample2: pd.DataFrame = (
+        pd.DataFrame(np.matmul(Y2.T.to_numpy(), Y2.to_numpy())) / n
+    )  # sample covariance matrix of squared returns
+    piMat: pd.DataFrame = pd.DataFrame(
+        sample2.to_numpy() - np.multiply(sample.to_numpy(), sample.to_numpy())
+    )
+
     pihat = sum(piMat.sum())
-    
 
-    
     # estimate the parameter that we call gamma in Ledoit and Wolf (2003, JEF)
-    gammahat = np.linalg.norm(sample.to_numpy()-target,ord = 'fro')**2
-    
-    
-    # diagonal part of the parameter that we call rho 
-    rho_diag=0;
-    
-    # off-diagonal part of the parameter that we call rho 
-    rho_off=0;
-    
+    gammahat = np.linalg.norm(sample.to_numpy() - target, ord="fro") ** 2
+
+    # diagonal part of the parameter that we call rho
+    rho_diag = 0
+    # off-diagonal part of the parameter that we call rho
+    rho_off = 0
     # compute shrinkage intensity
-    rhohat=rho_diag+rho_off
-    kappahat=(pihat-rhohat)/gammahat
-    shrinkage=max(0,min(1,kappahat/n))
-    
+    rhohat = rho_diag + rho_off
+    kappahat = (pihat - rhohat) / gammahat
+    shrinkage = max(0, min(1, kappahat / n))
+
     # compute shrinkage estimator
-    sigmahat=shrinkage*target+(1-shrinkage)*sample
-    
-    
+    sigmahat: pd.DataFrame = shrinkage * target + (1 - shrinkage) * sample
+
     return sigmahat
-
-import pandas as pd
-df = pd.read_csv(r'C:\Users\Patrick Ledoit\Documents\Python\translation\input1.csv')
-df = df.T.reset_index().T.reset_index(drop=True)
-df = df.astype(float)
-
-sigmahat = cov1Para(df)
-
