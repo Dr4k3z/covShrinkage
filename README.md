@@ -1,3 +1,7 @@
+[![mypy](https://github.com/Dr4k3z/covShrinkage/actions/workflows/mypy.yml/badge.svg)](https://github.com/Dr4k3z/covShrinkage/actions/workflows/mypy.yml)
+
+[![ruff](https://github.com/Dr4k3z/covShrinkage/actions/workflows/ruff.yml/badge.svg)](https://github.com/Dr4k3z/covShrinkage/actions/workflows/ruff.yml)
+
 # covShrinkage
 A Package for Shrinkage Estimation of Covariance Matrices
 
