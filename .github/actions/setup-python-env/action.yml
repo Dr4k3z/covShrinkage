@@ -1,5 +1,5 @@
-name: Setup Python Env
-description: Install project dependencies
+name: "Setup Python Env"
+description: "Install project dependencies"
 runs:
   using: "composite"
   steps:
@@ -7,10 +7,12 @@ runs:
       with:
         python-version: "3.12"
 
-    - run: |
+    - name: Install dependencies
+      shell: bash
+      working-directory: ${{ github.workspace }}   # ensure repo root
+      run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install -e .
-      shell: bash
-      
+
  
