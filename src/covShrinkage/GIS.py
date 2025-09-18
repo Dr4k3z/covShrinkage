@@ -1,16 +1,15 @@
-# -*- coding: utf-8 -*-
 """
 Created on Sun Oct  3 17:59:28 2021
 
 @author: Patrick Ledoit
 """
 
-# function sigmahat=GIS(Y,k) 
+# function sigmahat=GIS(Y,k)
 #
 # Y (N*p): raw data matrix of N iid observations on p random variables
 # sigmahat (p*p): invertible covariance matrix estimator
 #
-# Implements the geometric-inverse shrinkage (QIS) estimator  
+# Implements the geometric-inverse shrinkage (QIS) estimator
 #    This is a nonlinear shrinkage estimator based on the Symmetrized
 #    Kullback-Leibler loss; it can be viewed as geometrically averaging
 #    linear-inverse shrinkage (LIS) with quadratic-inverse shrinkage (QIS)
@@ -55,92 +54,87 @@ Created on Sun Oct  3 17:59:28 2021
 
 ### EXTRACT sample eigenvalues sorted in ascending order and eigenvectors ###
 
-#Imports
-import numpy as np
-import pandas as pd
+# Imports
 import math
 
-#Sigmahat function
-def GIS(Y,k=None):
-    #Pre-Conditions: Y is a valid pd.dataframe and optional arg- k which can be
+import numpy as np
+import pandas as pd
+
+
+# Sigmahat function
+def GIS(Y: pd.DataFrame, k: int | None = None) -> pd.DataFrame:
+    # Pre-Conditions: Y is a valid pd.dataframe and optional arg- k which can be
     #    None, np.nan or int
-    #Post-Condition: Sigmahat dataframe is returned
+    # Post-Condition: Sigmahat dataframe is returned
 
-    #Set df dimensions
-    N = Y.shape[0]                                              #num of columns
-    p = Y.shape[1]                                                 #num of rows
+    # Set df dimensions
+    N = Y.shape[0]  # num of columns
+    p = Y.shape[1]  # num of rows
 
-    #default setting
-    if (k is None or math.isnan(k)):
-        Y = Y.sub(Y.mean(axis=0), axis=1)                               #demean
+    # default setting
+    if k is None or math.isnan(k):
+        Y = Y.sub(Y.mean(axis=0), axis=1)  # demean
         k = 1
 
-    #vars
-    n = N-k                                      # adjust effective sample size
-    c = p/n                                               # concentration ratio
+    # vars
+    n = N - k  # adjust effective sample size
+    c = p / n  # concentration ratio
 
-    #Cov df: sample covariance matrix
-    sample = pd.DataFrame(np.matmul(Y.T.to_numpy(),Y.to_numpy()))/n     
-    sample = (sample+sample.T)/2                              #make symmetrical
+    # Cov df: sample covariance matrix
+    sample = pd.DataFrame(np.matmul(Y.T.to_numpy(), Y.to_numpy())) / n
+    sample = (sample + sample.T) / 2  # make symmetrical
 
-    #Spectral decomp
-    lambda1, u = np.linalg.eig(sample)                     #use LAPACK routines 
-    lambda1 = lambda1.real           #clip imaginary part due to rounding error
-    u = u.real                            #clip imaginary part for eigenvectors
+    # Spectral decomp
+    lambda1, u = np.linalg.eig(sample)  # use LAPACK routines
+    lambda1 = lambda1.real  # clip imaginary part due to rounding error
+    u = u.real  # clip imaginary part for eigenvectors
 
-    lambda1 = lambda1.real.clip(min=0)              #reset negative values to 0
-    dfu = pd.DataFrame(u,columns=lambda1)   #create df with column names lambda
+    lambda1 = lambda1.real.clip(min=0)  # reset negative values to 0
+    dfu = pd.DataFrame(u, columns=lambda1)  # create df with column names lambda
     #                                        and values u
-    dfu.sort_index(axis=1,inplace = True)              #sort df by column index
-    lambda1 = dfu.columns                              #recapture sorted lambda
+    dfu.sort_index(axis=1, inplace=True)  # sort df by column index
+    lambda1 = dfu.columns.to_numpy()  # recapture sorted lambda as numpy array
 
-    #COMPUTE Quadratic-Inverse Shrinkage estimator of the covariance matrix
-    h = (min(c**2,1/c**2)**0.35)/p**0.35                   #smoothing parameter
-    invlambda = 1/lambda1[max(1,p-n+1)-1:p]  #inverse of (non-null) eigenvalues
+    # COMPUTE Quadratic-Inverse Shrinkage estimator of the covariance matrix
+    h = (min(c**2, 1 / c**2) ** 0.35) / p**0.35  # smoothing parameter
+    invlambda = 1 / lambda1[max(1, p - n + 1) - 1 : p]  # inverse of (non-null) eigenvalues
     dfl = pd.DataFrame()
-    dfl['lambda'] = invlambda
-    Lj = dfl[np.repeat(dfl.columns.values,min(p,n))]          #like  1/lambda_j
-    Lj = pd.DataFrame(Lj.to_numpy())                        #Reset column names
-    Lj_i = Lj.subtract(Lj.T)                    #like (1/lambda_j)-(1/lambda_i)
-   
-    theta = Lj.multiply(Lj_i).div(Lj_i.multiply(Lj_i).add(
-        Lj.multiply(Lj)*h**2)).mean(axis = 0)          #smoothed Stein shrinker
-    Htheta = Lj.multiply(Lj*h).div(Lj_i.multiply(Lj_i).add(
-        Lj.multiply(Lj)*h**2)).mean(axis = 0)                    #its conjugate
-    Atheta2 = theta**2+Htheta**2                         #its squared amplitude
-    
-    if p<=n:               #case where sample covariance matrix is not singular
-        deltahat_1=(1-c)*invlambda+2*c*invlambda*theta #shrunk inverse eigenvalues (LIS)
-        
-        delta = 1 / ((1-c)**2*invlambda+2*c*(1-c)*invlambda*theta \
-                      +c**2*invlambda*Atheta2)    #optimally shrunk eigenvalues
+    dfl["lambda"] = invlambda
+    Lj = dfl[np.repeat(dfl.columns.values, min(p, n))]  # like  1/lambda_j
+    Lj = pd.DataFrame(Lj.to_numpy())  # Reset column names
+    Lj_i = Lj.subtract(Lj.T)  # like (1/lambda_j)-(1/lambda_i)
+
+    theta = (
+        Lj.multiply(Lj_i).div(Lj_i.multiply(Lj_i).add(Lj.multiply(Lj) * h**2)).mean(axis=0)
+    )  # smoothed Stein shrinker
+    Htheta = (
+        Lj.multiply(Lj * h).div(Lj_i.multiply(Lj_i).add(Lj.multiply(Lj) * h**2)).mean(axis=0)
+    )  # its conjugate
+    Atheta2 = theta**2 + Htheta**2  # its squared amplitude
+
+    if p <= n:  # case where sample covariance matrix is not singular
+        deltahat_1 = (
+            1 - c
+        ) * invlambda + 2 * c * invlambda * theta  # shrunk inverse eigenvalues (LIS)
+
+        delta = 1 / (
+            (1 - c) ** 2 * invlambda
+            + 2 * c * (1 - c) * invlambda * theta
+            + c**2 * invlambda * Atheta2
+        )  # optimally shrunk eigenvalues
         delta = delta.to_numpy()
-    else: # case where sample covariance matrix is singular
-        print('p must be <= n for the Symmetrized Kullback-Leibler divergence')       
-        return -1
-    
+    else:  # case where sample covariance matrix is singular
+        raise ValueError("p must be <= n for the Symmetrized Kullback-Leibler divergence")
+
     temp = pd.DataFrame(deltahat_1)
     x = min(invlambda)
     temp.loc[temp[0] < x, 0] = x
     deltaLIS_1 = temp[0]
 
     temp1 = dfu.to_numpy()
-    temp2 = np.diag((delta/deltaLIS_1)**0.5)
+    temp2 = np.diag((delta / deltaLIS_1) ** 0.5)
     temp3 = dfu.T.to_numpy().conjugate()
     # reconstruct covariance matrix
-    sigmahat = pd.DataFrame(np.matmul(np.matmul(temp1,temp2),temp3))
-    
+    sigmahat: pd.DataFrame = pd.DataFrame(np.matmul(np.matmul(temp1, temp2), temp3))
+
     return sigmahat
-
-#Data input (Change path to match your own here)
-df = pd.read_csv(r'C:\Users\user\Documents\Python\covShrinkage-main\covShrinkage-main\Y.csv')
-df = df.T.reset_index().T.reset_index(drop=True)
-df = df.astype(float)
-
-sigmahat = GIS(df)   #function call
-
-#display output
-pd.options.display.float_format = "{:,.16f}".format
-print(sigmahat) 
-#save output (Change path to match your own here)
-sigmahat.to_csv(r'C:\Users\user\Documents\Python\covShrinkage-main\covShrinkage-main\G_out.csv')
