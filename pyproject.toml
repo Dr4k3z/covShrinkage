@@ -33,6 +33,8 @@ quote-style = "double"
 known-first-party = ["covShrinkage"]
 
 [tool.mypy]
+mypy_path = "src"
+python_executable = ".venv/bin/python"
 strict = true
 ignore_missing_imports = true
 disallow_untyped_defs = true
@@ -43,5 +45,3 @@ warn_return_any = true
 warn_redundant_casts = true
 warn_unused_configs = true
 check_untyped_defs = true
-mypy_path = ["src"]
-python_executable = ".venv/bin/python"
