@@ -1,0 +1,153 @@
+from __future__ import annotations
+
+from typing import Any
+
+import numpy as np
+
+from .base import MatrixShapeComparisonError, NotNumpyArrayError, ShrunkedCovariance
+
+
+class TargetNotSetError(Exception):
+    """
+    Exception raised when the target matrix has not been set yet,
+    but the user calls a method that assumes its existence.
+    """
+
+    def __init__(self) -> None:
+        self._msg = "Target matrix is not set. Please set the target first."
+        super().__init__(self._msg)
+
+
+class CoeffInvalidError(Exception):
+    """
+    Exception raised when the shrinkage coefficients are invalid.
+    """
+
+    def __init__(self, coeff_name: str, coeff_value: Any) -> None:
+        self._msg = f"Shrinkage coefficient {coeff_name} has invalid value {coeff_value}."
+        super().__init__(self._msg)
+
+
+class CoeffNotSetError(Exception):
+    """
+    Exception raised when the shrinkage coefficients have not been set yet,
+    but the user calls a method that assumes their existence.
+    """
+
+    def __init__(self) -> None:
+        self._msg = "Shrinkage coefficients are not set. Please fit the model first."
+        super().__init__(self._msg)
+
+
+class LinearShrinkage(ShrunkedCovariance):
+    """
+    Linear Shrinkage estimator for covariance matrices.
+    The user of this class must set the shrinkage target and the shrinkage coefficient rho.
+    The estimator is defined as the convex combination between the sample covariance and the target:
+        Sigma_hat = (1 - rho) * Sample + rho * Target
+    where rho is a shrinkage coefficient in [0, 1].
+
+    The target matrix and the shrinkage coefficent can be set either at initialization or
+    later using the corresponding properties. The rho parameter can also be passed to the fit method
+    and will temporarily override the value set in the class. However, the object will continue storing the
+    past value. If neither the fit method nor the class have a value for rho, an exception will be raised.
+    """
+
+    def __init__(
+        self,
+        target: np.ndarray | None = None,
+        rho: float | None = None,
+        stop_precision: bool = True,
+        assume_centered: bool = True,
+    ) -> None:
+        super().__init__(stop_precision=stop_precision, assume_centered=assume_centered)
+
+        self._target: np.ndarray | None = target
+        self._rho: float | None = rho
+
+    @property
+    def target(self) -> np.ndarray:
+        if self._target is None:
+            raise TargetNotSetError()
+
+        return self._target
+
+    @target.setter
+    def target(self, value: np.ndarray) -> None:
+        if not isinstance(value, np.ndarray):
+            raise NotNumpyArrayError()
+        if value.ndim != 2 or value.shape[0] != value.shape[1]:
+            raise MatrixShapeComparisonError()
+        self._target = value
+
+    @property
+    def rho(self) -> float:
+        if self._rho is None:
+            raise CoeffNotSetError()
+
+        return self._rho
+
+    @rho.setter
+    def rho(self, value: float) -> None:
+        if not isinstance(value, (float, int)):
+            raise TypeError("rho should be a float or an int.")
+
+        if not (0 <= value <= 1):
+            raise CoeffInvalidError("rho", value)
+
+        self._rho = float(value)
+
+    def _fit(self, X: np.ndarray, *args: Any, **kwargs: Any) -> np.ndarray:
+        if not isinstance(X, np.ndarray):
+            raise NotNumpyArrayError()
+
+        if X.ndim != 2:
+            raise MatrixShapeComparisonError()
+
+        if args:
+            rho = float(args[0])
+        else:
+            rho = float(kwargs.get("rho", None))
+
+        if rho is None:
+            if self._rho is None:
+                raise CoeffNotSetError()
+            rho = self._rho
+
+        if self._target is None:
+            raise TargetNotSetError()
+
+        n_samples, _ = X.shape
+        covariance: np.ndarray = (1 - rho) * np.dot(X.T, X) / n_samples + rho * self._target
+        return covariance
+
+
+class IdentityShrinkage(LinearShrinkage):
+    def __init__(self, stop_precision: bool = True, assume_centered: bool = True) -> None:
+        super().__init__(stop_precision=stop_precision, assume_centered=assume_centered)
+        self._target = np.eye(1)  # Placeholder, will be resized in fit
+
+    def _fit(self, X: np.ndarray) -> np.ndarray:
+        n_sample, n_features = X.shape
+
+        sample_cov = np.dot(X.T, X) / n_sample
+        diag = np.diag(sample_cov)
+        meanvar = np.mean(diag)
+        self._target = meanvar * np.eye(n_features)
+
+        Y2 = np.dot(X.T, X)
+        sample2 = np.dot(Y2.T, Y2) / n_sample
+        piMat: np.ndarray = sample2 - np.multiply(sample_cov, sample_cov)
+
+        pihat = np.sum(piMat.sum())
+
+        gammahat = np.linalg.norm(sample_cov - self._target, ord="fro") ** 2
+        rho_diag = 0
+        rho_off = 0
+        rhohat = rho_diag + rho_off
+        kappahat = (pihat - rhohat) / gammahat
+        shrinkage = max(0, min(1, kappahat / n_sample))
+
+        sigmahat: np.ndarray = shrinkage * self._target + (1 - shrinkage) * sample_cov
+
+        return sigmahat

@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import Any, Literal
@@ -116,6 +119,8 @@ class ShrunkedCovariance(BaseEstimator, ABC):
     It provides a common interface for fitting and retrieving the shrunk covariance matrix.
     """
 
+    __array_priority__ = 10.0  # NumPy will call our __rsub__ method instead of its own
+
     def __init__(self, stop_precision: bool = True, assume_centered: bool = True) -> None:
         self._stop_precision = stop_precision
         self._assume_centered = assume_centered
@@ -124,11 +129,11 @@ class ShrunkedCovariance(BaseEstimator, ABC):
         self._precision: np.ndarray | None = None
 
     @abstractmethod
-    def _fit(self, X: np.ndarray) -> np.ndarray:
+    def _fit(self, X: np.ndarray, *args: Any, **kwargs: Any) -> np.ndarray:
         pass
 
     @validate_data
-    def fit(self, X: np.ndarray) -> "ShrunkedCovariance":
+    def fit(self, X: np.ndarray, *args: Any, **kwargs: Any) -> ShrunkedCovariance:
         """
         Common interface to fit the covariance matrix to the data.
         This function relies on the _fit method, which is implemented in the subclasses.
@@ -139,7 +144,7 @@ class ShrunkedCovariance(BaseEstimator, ABC):
         if not self._assume_centered:
             X = X - np.mean(X, axis=0)
 
-        covariance = self._fit(X)
+        covariance = self._fit(X, *args, **kwargs)
         self._covariance = covariance
 
         if self._stop_precision:
@@ -167,7 +172,7 @@ class ShrunkedCovariance(BaseEstimator, ABC):
 
     def error_norm(
         self,
-        other: np.ndarray | "ShrunkedCovariance",
+        other: np.ndarray | ShrunkedCovariance,
         norm: Literal["frobenius", "spectral"] = "frobenius",
         scaling: bool = True,
         squared: bool = True,
@@ -204,19 +209,97 @@ class ShrunkedCovariance(BaseEstimator, ABC):
     def covariance(self) -> np.ndarray:
         if self._covariance is None:
             raise CovarianceNotFittedError()
+
         return self._covariance
 
     @property
     def precision(self) -> np.ndarray:
         if self._precision is None:
             raise PrecisionNotFittedError()
+
         return self._precision
 
     @property
     def shape(self) -> tuple[int, int]:
         if self._covariance is None:
             raise CovarianceNotFittedError()
+
         return self._covariance.shape
+
+    def _coerce_to_np_array(self, other: np.ndarray | ShrunkedCovariance) -> np.ndarray:
+        if isinstance(other, np.ndarray):
+            return other
+        if isinstance(other, ShrunkedCovariance):
+            return other.covariance
+        raise TypeError("Trying to coerce an unsupported type to a numpy array.")
+
+    def __add__(self, other: np.ndarray | ShrunkedCovariance) -> np.ndarray:
+        other = self._coerce_to_np_array(other)
+        res: np.ndarray = np.array([])
+
+        try:
+            if other.shape != self.shape:
+                raise MatrixShapeComparisonError()
+        except AttributeError:
+            raise MatrixTypeComparisonError() from None
+
+        if isinstance(other, ShrunkedCovariance):
+            res = self.covariance + other.covariance
+        elif isinstance(other, np.ndarray):
+            res = self.covariance + other
+        else:
+            raise MatrixTypeComparisonError()
+
+        return res
+
+    def __radd__(self, other: np.ndarray | ShrunkedCovariance) -> np.ndarray:
+        return self.__add__(other)
+
+    def __sub__(self, other: np.ndarray | ShrunkedCovariance) -> np.ndarray:
+        other = self._coerce_to_np_array(other)
+        res: np.ndarray = np.array([])
+
+        try:
+            if other.shape != self.shape:
+                raise MatrixShapeComparisonError()
+        except AttributeError:
+            raise MatrixTypeComparisonError() from None
+
+        if isinstance(other, ShrunkedCovariance):
+            res = self.covariance - other.covariance
+        elif isinstance(other, np.ndarray):
+            res = self.covariance - other
+        else:
+            raise MatrixTypeComparisonError()
+
+        return res
+
+    def __rsub__(self, other: np.ndarray | ShrunkedCovariance) -> np.ndarray:
+        res: np.ndarray = np.array([])
+
+        try:
+            if other.shape != self.shape:
+                raise MatrixShapeComparisonError()
+        except AttributeError:
+            raise MatrixTypeComparisonError() from None
+
+        if isinstance(other, ShrunkedCovariance):
+            res = other.covariance - self.covariance
+        elif isinstance(other, np.ndarray):
+            res = other - self.covariance
+        else:
+            raise MatrixTypeComparisonError()
+
+        return res
+
+    def __array__(self, dtype: type | None = None) -> np.ndarray:
+        # alert the user
+        warnings.warn(
+            "The instance {self.__class__.__name__} is being converted to a numpy array.",
+            UserWarning,
+            stacklevel=2,
+        )
+        return np.asanyarray(self.covariance, dtype=dtype)
 
 
 class EmpiricalCovariance(ShrunkedCovariance):
@@ -227,11 +310,3 @@ class EmpiricalCovariance(ShrunkedCovariance):
         n_samples = X.shape[0]
         covariance: np.ndarray = np.dot(X.T, X) / n_samples
         return covariance
-
-
-class LedoitWolfShrinkage(ShrunkedCovariance):
-    def __init__(self, stop_precision: bool = True, assume_centered: bool = True) -> None:
-        super().__init__(stop_precision=stop_precision, assume_centered=assume_centered)
-
-    def _fit(self, X: np.ndarray) -> np.ndarray:
-        return np.zeros((X.shape[1], X.shape[1]))  # Placeholder implementation
