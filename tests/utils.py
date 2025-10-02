@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
@@ -20,3 +22,9 @@ def create_df() -> tuple[np.ndarray, pd.DataFrame]:
 
     df = pd.DataFrame(np.random.multivariate_normal(np.zeros(N), sigma, size=T))
     return sigma, df
+
+
+def read_matrix(filename: str | Path) -> np.ndarray:
+    df = pd.read_csv(filename, header=None)
+    X = df.values
+    return X

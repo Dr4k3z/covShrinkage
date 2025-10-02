@@ -54,9 +54,16 @@ Created on Thu Jul  8 20:21:58 2021
 ###########################################################################
 
 import math
+import warnings
 
 import numpy as np
 import pandas as pd
+
+warnings.warn(
+    "cov1Para module is deprecated and will be removed. Use linear.IdentityShrinkage instead.",
+    DeprecationWarning,
+    stacklevel=2,  # points at the *import* site
+)
 
 
 def cov1Para(Y: pd.DataFrame, k: int | None = None) -> pd.DataFrame:
