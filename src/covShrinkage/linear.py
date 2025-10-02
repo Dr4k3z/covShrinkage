@@ -98,6 +98,22 @@ class LinearShrinkage(ShrunkedCovariance):
         self._rho = float(value)
 
     def _fit(self, X: np.ndarray, *args: Any, **kwargs: Any) -> np.ndarray:
+        """
+        The _fit method performs some validation checks on the provided arguments. At this level,
+        although the number of arguments to be passed is not fixed, only the first positional two are considered.
+        In particular, the first positional argument (if any) is considered as the shrinkage coefficient rho,
+        while the second positional argument (if any) is ignored. The keyword argument 'rho' is also considered
+        (if present) as the shrinkage coefficient. If both the positional and keyword arguments are provided,
+        the positional argument takes precedence. If neither is provided, the method uses the value stored
+        in the class instance. If no value is found, an exception is raised.
+        After determining the value of rho, the method checks if the target matrix has been set. If not, an exception is raised.
+        Finally, the method computes and returns the shrunk covariance matrix using the formula:
+            Sigma_hat = (1 - rho) * Sample + rho * Target
+        where Sample is the sample covariance matrix computed from the data X.
+
+        The variable number of arguments is designed to be compatible with derived classes, like IdentityShrinkage,
+        which may require additional parameters for their fitting process.
+        """
         if not isinstance(X, np.ndarray):
             raise NotNumpyArrayError()
 
@@ -105,14 +121,16 @@ class LinearShrinkage(ShrunkedCovariance):
             raise MatrixShapeComparisonError()
 
         if args:
-            rho = float(args[0])
+            rho = args[0]
         else:
-            rho = float(kwargs.get("rho", None))
+            rho = kwargs.get("rho", None)
 
         if rho is None:
             if self._rho is None:
                 raise CoeffNotSetError()
             rho = self._rho
+        else:
+            rho = float(rho)
 
         if self._target is None:
             raise TargetNotSetError()
@@ -123,31 +141,46 @@ class LinearShrinkage(ShrunkedCovariance):
 
 
 class IdentityShrinkage(LinearShrinkage):
-    def __init__(self, stop_precision: bool = True, assume_centered: bool = True) -> None:
+    """
+    Linear Shrinkage estimator with identity target.
+    The target matrix is set to mean(var) * I, where mean(var) is the mean of the variances
+    of the features and I is the identity matrix. The shrinkage coefficient rho is estimated from the data
+    using the Ledoit-Wolf approach, as described in the paper:
+
+    Ledoit, O., & Wolf, M. (2004). A well-conditioned estimator for large-dimensional covariance matrices.
+    Journal of Multivariate Analysis, 88(2), 365-411.
+
+    The user of this class can only set the stop_precision and assume_centered parameters at initialization.
+    The target matrix and the shrinkage coefficient are automatically set during the fitting process.
+    """
+
+    def __init__(self, stop_precision: bool = True, assume_centered: bool = False) -> None:
         super().__init__(stop_precision=stop_precision, assume_centered=assume_centered)
-        self._target = np.eye(1)  # Placeholder, will be resized in fit
+        self._target: np.ndarray | None = None
 
     def _fit(self, X: np.ndarray) -> np.ndarray:
-        n_sample, n_features = X.shape
+        n_samples, n_features = X.shape
 
-        sample_cov = np.dot(X.T, X) / n_sample
-        diag = np.diag(sample_cov)
-        meanvar = np.mean(diag)
+        if not self._assume_centered:
+            n_samples -= 1
+
+        sample = np.dot(X.T, X) / n_samples
+
+        diag = np.diag(sample)
+        meanvar = sum(diag) / len(diag)
         self._target = meanvar * np.eye(n_features)
 
-        Y2 = np.dot(X.T, X)
-        sample2 = np.dot(Y2.T, Y2) / n_sample
-        piMat: np.ndarray = sample2 - np.multiply(sample_cov, sample_cov)
+        Y2 = np.multiply(X, X)
+        sample2 = np.dot(Y2.T, Y2) / n_samples
+        piMat = sample2 - np.multiply(sample, sample)
 
-        pihat = np.sum(piMat.sum())
+        pi_hat = sum(piMat.sum(axis=1))
 
-        gammahat = np.linalg.norm(sample_cov - self._target, ord="fro") ** 2
-        rho_diag = 0
-        rho_off = 0
-        rhohat = rho_diag + rho_off
-        kappahat = (pihat - rhohat) / gammahat
-        shrinkage = max(0, min(1, kappahat / n_sample))
+        gamma_hat = np.linalg.norm(sample - self._target, ord="fro") ** 2
 
-        sigmahat: np.ndarray = shrinkage * self._target + (1 - shrinkage) * sample_cov
+        kappa_hat = pi_hat / gamma_hat
+        rho = max(0, min(1, kappa_hat / n_samples))
 
-        return sigmahat
+        sigma_hat: np.ndarray = (1 - rho) * sample + rho * self._target
+        self._rho = rho
+        return sigma_hat

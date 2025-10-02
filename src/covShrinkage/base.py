@@ -121,7 +121,7 @@ class ShrunkedCovariance(BaseEstimator, ABC):
 
     __array_priority__ = 10.0  # NumPy will call our __rsub__ method instead of its own
 
-    def __init__(self, stop_precision: bool = True, assume_centered: bool = True) -> None:
+    def __init__(self, stop_precision: bool = True, assume_centered: bool = False) -> None:
         self._stop_precision = stop_precision
         self._assume_centered = assume_centered
 
