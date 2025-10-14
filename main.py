@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from covShrinkage.cov1Para import cov1Para
+from covShrinkage.linear import LinearShrinkage
 
 N, T = 100, 150
 
@@ -18,8 +18,11 @@ def create_df() -> tuple[np.ndarray, pd.DataFrame]:
 
 if __name__ == "__main__":
     sigma, df = create_df()
-    sigmahat = cov1Para(df)
     sample_cov = np.cov(df, rowvar=False)
+
+    sigmahat = LinearShrinkage(assume_centered=True)
+    sigmahat.target = np.eye(N)
+    sigmahat.fit(df.values, rho=0.1)
 
     print(
         f"Error: {np.linalg.norm(sigma - sigmahat, ord='fro') / np.linalg.norm(sigma, ord='fro')}"
