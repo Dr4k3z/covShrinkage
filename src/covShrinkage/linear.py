@@ -125,12 +125,13 @@ class LinearShrinkage(ShrunkedCovariance):
         else:
             rho = kwargs.get("rho", None)
 
-        if rho is None:
+        rho_value = args[0] if args else kwargs.get("rho", None)
+        if rho_value is None:
             if self._rho is None:
                 raise CoeffNotSetError()
             rho = self._rho
         else:
-            rho = float(rho)
+            rho = float(rho_value)
 
         if self._target is None:
             raise TargetNotSetError()

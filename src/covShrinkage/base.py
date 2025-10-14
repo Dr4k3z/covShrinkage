@@ -3,6 +3,7 @@ from __future__ import annotations
 import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Callable
+from functools import wraps
 from typing import Any, Literal
 
 import numpy as np
@@ -94,6 +95,7 @@ def validate_data(func: Callable[..., Any]) -> Callable[..., Any]:
     and their corresponding exceptions.
     """
 
+    @wraps(func)
     def inner(*args: Any, **kwargs: Any) -> Any:
         if args:
             X = args[1] if len(args) > 1 else args[0]
@@ -162,7 +164,7 @@ class ShrunkedCovariance(BaseEstimator, ABC):
         has been computed (i.e., stop_precision is False). It also performs data validation
         and centering if required. Returns the log-likelihood value.
         """
-        if self._assume_centered:
+        if not self._assume_centered:
             X_test = X_test - np.mean(X_test, axis=0)
 
         test_cov = self._fit(X_test)
