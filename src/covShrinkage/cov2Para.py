@@ -53,9 +53,16 @@ Created on Sun Aug 29 16:08:52 2021
 ###########################################################################
 
 import math
+import warnings
 
 import numpy as np
 import pandas as pd
+
+warnings.warn(
+    "cov2Para module is deprecated and will be removed. Use linear.TwoParametersShrinkage instead.",
+    DeprecationWarning,
+    stacklevel=2,  # points at the *import* site
+)
 
 
 def cov2Para(Y: pd.DataFrame, k: int | None = None) -> pd.DataFrame:

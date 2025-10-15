@@ -5,9 +5,16 @@ Created on Sun Sep 12 16:17:27 2021
 """
 
 import math
+import warnings
 
 import numpy as np
 import pandas as pd
+
+warnings.warn(
+    "covMarket module is deprecated and will be removed. Use market.MarketShrinkage instead.",
+    DeprecationWarning,
+    stacklevel=2,  # points at the *import* site
+)
 
 
 def covMarket(Y: pd.DataFrame, k: int | None = None) -> pd.DataFrame:

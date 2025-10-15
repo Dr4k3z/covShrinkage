@@ -54,10 +54,17 @@ Created on Sun Aug 29 17:08:18 2021
 ###########################################################################
 
 import math
+import warnings
 
 import numpy as np
 import numpy.matlib as mt
 import pandas as pd
+
+warnings.warn(
+    "covCor module is deprecated and will be removed. Use corr.CorrelationShrinkage instead.",
+    DeprecationWarning,
+    stacklevel=2,  # points at the *import* site
+)
 
 
 def covCor(Y: pd.DataFrame, k: int | None = None) -> pd.DataFrame:

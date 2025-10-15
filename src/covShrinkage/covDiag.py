@@ -54,9 +54,16 @@ Created on Sun Sep 12 16:07:10 2021
 ###########################################################################
 
 import math
+import warnings
 
 import numpy as np
 import pandas as pd
+
+warnings.warn(
+    "covDiag module is deprecated and will be removed. Use diag.DiagonalShrinkage instead.",
+    DeprecationWarning,
+    stacklevel=2,  # points at the *import* site
+)
 
 
 def covDiag(Y: pd.DataFrame, k: int | None = None) -> pd.DataFrame:

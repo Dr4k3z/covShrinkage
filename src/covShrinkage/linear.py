@@ -120,11 +120,6 @@ class LinearShrinkage(ShrunkedCovariance):
         if X.ndim != 2:
             raise MatrixShapeComparisonError()
 
-        if args:
-            rho = args[0]
-        else:
-            rho = kwargs.get("rho", None)
-
         rho_value = args[0] if args else kwargs.get("rho", None)
         if rho_value is None:
             if self._rho is None:
@@ -184,4 +179,56 @@ class IdentityShrinkage(LinearShrinkage):
 
         sigma_hat: np.ndarray = (1 - rho) * sample + rho * self._target
         self._rho = rho
+        return sigma_hat
+
+
+class TwoParametersShrinkage(LinearShrinkage):
+    """
+    Linear Shrinkage estimator with two-parameters target. The sample covariance matrix is shrunk
+    towards a target with two parameters:
+        - all variances are the same
+        - all covariances are the same
+    """
+
+    def __init__(self, stop_precision: bool = True, assume_centered: bool = False) -> None:
+        super().__init__(stop_precision=stop_precision, assume_centered=assume_centered)
+        self._target: np.ndarray | None = None
+
+    def _fit(self, X: np.ndarray) -> np.ndarray:
+        n_samples, n_features = X.shape
+
+        if not self._assume_centered:
+            n_samples -= 1
+
+        sample = np.dot(X.T, X) / n_samples
+
+        diag = np.diag(sample)
+        meanvar = sum(diag) / len(diag)
+        meancov = (np.sum(sample) - np.sum(np.eye(n_features) * sample)) / (
+            n_features * (n_features - 1)
+        )
+        self._target = meanvar * np.eye(n_features) + meancov * (1 - np.eye(n_features))
+
+        Y2 = np.multiply(X, X)
+        sample2 = np.dot(Y2.T, Y2) / n_samples
+        piMat = sample2 - np.multiply(sample, sample)
+
+        pi_hat = sum(piMat.sum(axis=1))
+
+        gamma_hat = np.linalg.norm(sample - self._target, ord="fro") ** 2
+
+        rho_diag = (sample2.sum() - np.trace(sample) ** 2) / n_features
+        sum1 = X.sum(axis=1)
+        sum2 = Y2.sum(axis=1)
+        temp = np.multiply(sum1, sum1) - sum2
+        rho_off1 = np.sum(np.multiply(temp, temp)) / (n_features * n_samples)
+        rho_off2 = (sample.sum() - np.trace(sample)) ** 2 / n_features
+        rho_off = (rho_off1 - rho_off2) / (n_features - 1)
+
+        rho_hat = rho_diag + rho_off
+        kappa_hat = (pi_hat - rho_hat) / gamma_hat
+        rho = max(0, min(1, kappa_hat / n_samples))
+        self._rho = rho
+
+        sigma_hat: np.ndarray = (1 - rho) * sample + rho * self._target
         return sigma_hat

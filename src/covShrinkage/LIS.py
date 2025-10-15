@@ -54,9 +54,16 @@ Created on Sun Oct  3 17:18:14 2021
 
 # Imports
 import math
+import warnings
 
 import numpy as np
 import pandas as pd
+
+warnings.warn(
+    "LIS module is deprecated and will be removed. Use linear.IdentityShrinkage instead.",
+    DeprecationWarning,
+    stacklevel=2,  # points at the *import* site
+)
 
 
 # Sigmahat function
