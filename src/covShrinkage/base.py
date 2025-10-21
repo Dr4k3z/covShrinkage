@@ -127,6 +127,10 @@ class ShrunkedCovariance(BaseEstimator, ABC):
         self._stop_precision = stop_precision
         self._assume_centered = assume_centered
 
+        self.assume_centered: bool = (
+            self._assume_centered
+        )  # I need this public exposed because of skfolio
+
         self._covariance: np.ndarray | None = None
         self._precision: np.ndarray | None = None
 

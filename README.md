@@ -1,6 +1,7 @@
-[![mypy](https://github.com/Dr4k3z/covShrinkage/actions/workflows/mypy.yml/badge.svg)](https://github.com/Dr4k3z/covShrinkage/actions/workflows/mypy.yml)
+[![mypy](https://github.com/Dr4k3z/covShrinkage/actions/workflows/mypy.yml/badge.svg)](https://github.com/Dr4k3z/covShrinkage/actions/workflows/mypy.yml) [![ruff](https://github.com/Dr4k3z/covShrinkage/actions/workflows/ruff.yml/badge.svg)](https://github.com/Dr4k3z/covShrinkage/actions/workflows/ruff.yml)
 
-[![ruff](https://github.com/Dr4k3z/covShrinkage/actions/workflows/ruff.yml/badge.svg)](https://github.com/Dr4k3z/covShrinkage/actions/workflows/ruff.yml)
+> [!WARNING]
+> This is an un-official refactor of the original code provided by the authors of the following papers. It has not been checked by any university professor and may contain errors.
 
 # covShrinkage
 A Package for Shrinkage Estimation of Covariance Matrices
@@ -24,13 +25,26 @@ Second optional input parameter: If the second (optional) parameter k is absent,
 
 OUTPUT: sigmahat (p*p): invertible covariance matrix estimator.
 
-REFERENCES:
-a) Ledoit, O. (1995). Essays on Risk and Return in the Stock Market. PhD thesis, Massachusetts Institute of Technology, Sloan School of Management. Available online at http://dspace.mit.edu/handle/1721.1/11875. 
-b) Ledoit, O. and Wolf, M. (2003). Improved estimation of the covariance matrix of stock returns with an application to portfolio selection. Journal of Empirical Finance, 10(5):603–621. doi:10.1016/S0927-5398(03)00007-0
-c) Ledoit, O. and Wolf, M. (2004a). Honey, I shrunk the sample covariance matrix. Journal of Portfolio Management, 30(4):110–119.
-d) Ledoit, O. and Wolf, M. (2004b). A well-conditioned estimator for large-dimensional covariance matrices. Journal of Multivariate Analysis, 88(2):365–411. doi:10.1016/S0047-259X(03)00096-4
-e) Ledoit, O. and Wolf, M. (2022). Quadratic shrinkage for large covariance matrices. Bernoulli. Forthcoming. Working paper version UZH ECON 335 available online at
-https://www.econ.uzh.ch/en/people/faculty/wolf/publications.html.
+### References
+
+- **(a)** Ledoit, O. (1995). *Essays on Risk and Return in the Stock Market.* Ph.D. thesis, Massachusetts Institute of Technology, Sloan School of Management.  
+  Available online at [http://dspace.mit.edu/handle/1721.1/11875](http://dspace.mit.edu/handle/1721.1/11875).
+
+- **(b)** Ledoit, O., & Wolf, M. (2003). *Improved estimation of the covariance matrix of stock returns with an application to portfolio selection.*  
+  *Journal of Empirical Finance, 10*(5), 603–621.  
+  [https://doi.org/10.1016/S0927-5398(03)00007-0](https://doi.org/10.1016/S0927-5398(03)00007-0)
+
+- **(c)** Ledoit, O., & Wolf, M. (2004a). *Honey, I shrunk the sample covariance matrix.*  
+  *Journal of Portfolio Management, 30*(4), 110–119.
+
+- **(d)** Ledoit, O., & Wolf, M. (2004b). *A well-conditioned estimator for large-dimensional covariance matrices.*  
+  *Journal of Multivariate Analysis, 88*(2), 365–411.  
+  [https://doi.org/10.1016/S0047-259X(03)00096-4](https://doi.org/10.1016/S0047-259X(03)00096-4)
+
+- **(e)** Ledoit, O., & Wolf, M. (2022). *Quadratic shrinkage for large covariance matrices.* *Bernoulli* (forthcoming).  
+  Working paper version UZH ECON 335 available online at:  
+  [https://www.econ.uzh.ch/en/people/faculty/wolf/publications.html](https://www.econ.uzh.ch/en/people/)
+
 
 Copyright 2022:
 - Olivier Ledoit (olivier.ledoit@econ.uzh.ch) for the Matlab version
