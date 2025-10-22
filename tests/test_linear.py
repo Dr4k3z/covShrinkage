@@ -1,7 +1,6 @@
 import numpy as np
-import pytest
 
-from covShrinkage.linear import CoeffNotSetError, LinearShrinkage, TargetNotSetError
+from covShrinkage.linear import LinearShrinkage
 
 
 class TestLinearShrinkage:
@@ -9,15 +8,17 @@ class TestLinearShrinkage:
         ls = LinearShrinkage()
 
         # Should have None values initially
-        assert ls._target is None
-        assert ls._rho is None
+        assert ls.target == 0.0
+        assert ls.rho == 0.5
 
+        # TODO: remove this deprecated code
         # Properties should raise when accessing None values
-        with pytest.raises(TargetNotSetError):
-            _ = ls.target
+        # with pytest.raises(CoeffNotSetError):
+        #    _ = ls.fit(np.array([[0, 0], [0, 0]]))
 
-        with pytest.raises(CoeffNotSetError):
-            _ = ls.rho
+        # with pytest.raises(TargetNotSetError):
+        #    ls.rho = 0.0
+        #    _ = ls.fit(np.array([[0, 0], [0, 0]]))
 
     def test_init_with_target_and_rho(self) -> None:
         """Test initialization with target and rho."""
@@ -35,8 +36,9 @@ class TestLinearShrinkage:
         ls = LinearShrinkage(target=target)
 
         np.testing.assert_array_equal(ls.target, target)
-        with pytest.raises(CoeffNotSetError):
-            _ = ls.rho
+        # deprecated code
+        # with pytest.raises(CoeffNotSetError):
+        #    _ = ls.fit(np.array([[0, 0], [0, 0]]))
 
     def test_init_with_rho_only(self) -> None:
         """Test initialization with rho only."""
@@ -44,5 +46,6 @@ class TestLinearShrinkage:
         ls = LinearShrinkage(rho=rho)
 
         assert ls.rho == rho
-        with pytest.raises(TargetNotSetError):
-            _ = ls.target
+        # deprecated code
+        # with pytest.raises(TargetNotSetError):
+        #    _ = ls.fit(np.array([[0, 0], [0, 0]]))

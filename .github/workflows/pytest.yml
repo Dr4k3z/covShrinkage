@@ -1,0 +1,13 @@
+name: mypy
+
+on:
+  - push
+  - pull_request
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-python-env
+      -  run:  pytest tests/test_sklearn_integration.py # integration test with sklearn
