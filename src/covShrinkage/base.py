@@ -3,12 +3,16 @@ from __future__ import annotations
 import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from functools import wraps
 from typing import Any, Literal
 
 import numpy as np
 from sklearn.base import BaseEstimator
 from sklearn.utils.extmath import fast_logdet
+from sklearn.utils.validation import (  # type: ignore[attr-defined]
+    check_array,
+    check_is_fitted,
+    validate_data,
+)
 
 
 class CovarianceNotFittedError(Exception):
@@ -88,26 +92,6 @@ def log_likelihood(cov: np.ndarray, precision: np.ndarray) -> float:
     return log_likelihood_
 
 
-def validate_data(func: Callable[..., Any]) -> Callable[..., Any]:
-    """
-    This decorator is used to check if the input data is indeed a numpy array.
-    If not, it raises a NotNumpyArrayError. In the future I might also add more checks
-    and their corresponding exceptions.
-    """
-
-    @wraps(func)
-    def inner(*args: Any, **kwargs: Any) -> Any:
-        if args:
-            X = args[1] if len(args) > 1 else args[0]
-        else:
-            X = kwargs.get("X", None)
-        if not isinstance(X, np.ndarray):
-            raise NotNumpyArrayError()
-        return func(*args, **kwargs)
-
-    return inner
-
-
 norms_dictionary: dict[str, Callable[[np.ndarray], float]] = {
     "frobenius": lambda x: np.sum(x**2),
     "spectral": lambda x: np.amax(np.linalg.svd(np.dot(x.T, x), compute_uv=False)),
@@ -123,55 +107,99 @@ class ShrunkedCovariance(BaseEstimator, ABC):
 
     __array_priority__ = 10.0  # NumPy will call our __rsub__ method instead of its own
 
-    def __init__(self, stop_precision: bool = True, assume_centered: bool = False) -> None:
-        self._stop_precision = stop_precision
-        self._assume_centered = assume_centered
-
-        self.assume_centered: bool = (
-            self._assume_centered
-        )  # I need this public exposed because of skfolio
+    def __init__(self, store_precision: bool = True, assume_centered: bool = False) -> None:
+        self.store_precision = store_precision
+        self.assume_centered = assume_centered
 
         self._covariance: np.ndarray | None = None
         self._precision: np.ndarray | None = None
+
+    def _set_covariance(self, covariance: np.ndarray) -> None:
+        check_array(covariance)
+
+        self._covariance = covariance
+
+        if self.store_precision:
+            self._precision = np.linalg.pinv(covariance)
+        else:
+            self._precision = None
+
+    @property
+    def covariance(self) -> np.ndarray:
+        if self._covariance is None:
+            raise CovarianceNotFittedError()
+
+        return self._covariance
+
+    @property
+    def precision(self) -> np.ndarray | None:
+        if self.store_precision:
+            precision = self._precision
+        else:
+            precision = np.linalg.pinv(self.covariance)
+
+        return precision
 
     @abstractmethod
     def _fit(self, X: np.ndarray, *args: Any, **kwargs: Any) -> np.ndarray:
         pass
 
-    @validate_data
-    def fit(self, X: np.ndarray, *args: Any, **kwargs: Any) -> ShrunkedCovariance:
+    def fit(
+        self, X: np.ndarray, y: np.ndarray | None = None, *args: Any, **kwargs: Any
+    ) -> ShrunkedCovariance:
         """
         Common interface to fit the covariance matrix to the data.
         This function relies on the _fit method, which is implemented in the subclasses.
         It performs data validation and centering if required. Also, if stop_precision is
         set to True, it computes the pseudo-inverse of the covariance matrix to get the precision
         matrix. Returns the instance itself.
+
+        The y parameter is ignored and exists only for compatibility with scikit-learn's
+        fit method signature.
+
         """
-        if not self._assume_centered:
+        X = validate_data(self, X, y=None, ensure_2d=True, dtype=np.float64, copy=False)
+
+        n_samples, n_features = X.shape
+        if n_features == 1:
+            raise ValueError(
+                f"n_features = {n_features} is too small; at least 2 features are required"
+            )
+        if n_samples < 2:
+            raise ValueError(
+                f"n_samples = {n_samples} is too small to estimate covariance; at least 2 samples are required"
+            )
+
+        if not self.assume_centered:
             X = X - np.mean(X, axis=0)
 
         covariance = self._fit(X, *args, **kwargs)
-        self._covariance = covariance
-
-        if self._stop_precision:
-            self._precision = np.linalg.pinv(covariance)
-        else:
-            self._precision = None
+        self._set_covariance(covariance)
 
         return self
 
-    @validate_data
-    def score(self, X_test: np.ndarray) -> float:
+    def score(self, X_test: np.ndarray, y: np.ndarray | None = None) -> float:
         """
         Compute the log-likelihood fo X_test under the estimated covariance model.
         This function requires that the model has been fitted and that the precision matrix
         has been computed (i.e., stop_precision is False). It also performs data validation
         and centering if required. Returns the log-likelihood value.
+
+        y parameter is ignored and exists only for compatibility with scikit-learn's
+        score method signature.
         """
-        if not self._assume_centered:
+        check_is_fitted(self, ["_covariance"])
+
+        X_test = validate_data(
+            self, X_test, y=None, ensure_2d=True, dtype=np.float64, copy=False, reset=False
+        )
+
+        if not self.assume_centered:
             X_test = X_test - np.mean(X_test, axis=0)
 
         test_cov = self._fit(X_test)
+        if self.precision is None:
+            raise PrecisionNotFittedError()
         res = log_likelihood(test_cov, self.precision)
 
         return res
@@ -210,20 +238,6 @@ class ShrunkedCovariance(BaseEstimator, ABC):
         if scaling:
             squared_norm /= error.shape[0]
         return squared_norm if squared else float(np.sqrt(squared_norm))
-
-    @property
-    def covariance(self) -> np.ndarray:
-        if self._covariance is None:
-            raise CovarianceNotFittedError()
-
-        return self._covariance
-
-    @property
-    def precision(self) -> np.ndarray:
-        if self._precision is None:
-            raise PrecisionNotFittedError()
-
-        return self._precision
 
     @property
     def shape(self) -> tuple[int, int]:
@@ -309,8 +323,8 @@ class ShrunkedCovariance(BaseEstimator, ABC):
 
 
 class EmpiricalCovariance(ShrunkedCovariance):
-    def __init__(self, stop_precision: bool = True, assume_centered: bool = True) -> None:
-        super().__init__(stop_precision=stop_precision, assume_centered=assume_centered)
+    def __init__(self, store_precision: bool = True, assume_centered: bool = True) -> None:
+        super().__init__(store_precision=store_precision, assume_centered=assume_centered)
 
     def _fit(self, X: np.ndarray) -> np.ndarray:
         n_samples = X.shape[0]

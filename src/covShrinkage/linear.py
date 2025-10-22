@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from typing import Any
 
 import numpy as np
@@ -39,6 +40,15 @@ class CoeffNotSetError(Exception):
         super().__init__(self._msg)
 
 
+class ConstructorWarning(UserWarning):
+    """
+    Warning raised when the user provides invalid parameters to the constructor.
+    """
+
+    def __init__(self, msg: str) -> None:
+        super().__init__(msg)
+
+
 class LinearShrinkage(ShrunkedCovariance):
     """
     Linear Shrinkage estimator for covariance matrices.
@@ -55,21 +65,36 @@ class LinearShrinkage(ShrunkedCovariance):
 
     def __init__(
         self,
-        target: np.ndarray | None = None,
-        rho: float | None = None,
-        stop_precision: bool = True,
+        target: np.ndarray | float = 0.0,
+        rho: float = 0.5,
+        store_precision: bool = True,
         assume_centered: bool = True,
     ) -> None:
-        super().__init__(stop_precision=stop_precision, assume_centered=assume_centered)
+        super().__init__(store_precision=store_precision, assume_centered=assume_centered)
+        if not isinstance(target, np.ndarray | None):
+            warnings.warn(
+                "Target should be a numpy array or None. Setting target to zero.",
+                ConstructorWarning,
+                stacklevel=2,
+            )
+            self.target: np.ndarray | float = 0.0
+        else:
+            self.target = target
 
-        self._target: np.ndarray | None = target
-        self._rho: float | None = rho
+        if not isinstance(rho, float | int) or not (0 <= rho <= 1):
+            warnings.warn(
+                "rho should be a float or an int betwee 0 and 1. Setting rho to 0.5.",
+                ConstructorWarning,
+                stacklevel=2,
+            )
+            self.rho: float = 0.5
+        else:
+            self.rho = float(rho)
 
+    # TODO: remove this deprecated code
+    """
     @property
-    def target(self) -> np.ndarray:
-        if self._target is None:
-            raise TargetNotSetError()
-
+    def target(self) -> np.ndarray | float:
         return self._target
 
     @target.setter
@@ -82,20 +107,17 @@ class LinearShrinkage(ShrunkedCovariance):
 
     @property
     def rho(self) -> float:
-        if self._rho is None:
-            raise CoeffNotSetError()
-
         return self._rho
 
     @rho.setter
     def rho(self, value: float) -> None:
         if not isinstance(value, (float, int)):
             raise TypeError("rho should be a float or an int.")
-
         if not (0 <= value <= 1):
             raise CoeffInvalidError("rho", value)
 
         self._rho = float(value)
+    """
 
     def _fit(self, X: np.ndarray, *args: Any, **kwargs: Any) -> np.ndarray:
         """
@@ -122,17 +144,18 @@ class LinearShrinkage(ShrunkedCovariance):
 
         rho_value = args[0] if args else kwargs.get("rho", None)
         if rho_value is None:
-            if self._rho is None:
+            if self.rho is None:
                 raise CoeffNotSetError()
-            rho = self._rho
+            rho = self.rho
         else:
             rho = float(rho_value)
 
-        if self._target is None:
-            raise TargetNotSetError()
+        target = args[1] if len(args) > 1 else kwargs.get("target", None)
+        if target is None:
+            target = np.eye(X.shape[1])
 
         n_samples, _ = X.shape
-        covariance: np.ndarray = (1 - rho) * np.dot(X.T, X) / n_samples + rho * self._target
+        covariance: np.ndarray = (1 - rho) * np.dot(X.T, X) / n_samples + rho * target
         return covariance
 
 
@@ -150,14 +173,14 @@ class IdentityShrinkage(LinearShrinkage):
     The target matrix and the shrinkage coefficient are automatically set during the fitting process.
     """
 
-    def __init__(self, stop_precision: bool = True, assume_centered: bool = False) -> None:
-        super().__init__(stop_precision=stop_precision, assume_centered=assume_centered)
-        self._target: np.ndarray | None = None
+    def __init__(self, store_precision: bool = True, assume_centered: bool = False) -> None:
+        super().__init__(store_precision=store_precision, assume_centered=assume_centered)
+        self._target: np.ndarray | float = 0.0
 
     def _fit(self, X: np.ndarray) -> np.ndarray:
         n_samples, n_features = X.shape
 
-        if not self._assume_centered:
+        if not self.assume_centered:
             n_samples -= 1
 
         sample = np.dot(X.T, X) / n_samples
@@ -190,14 +213,14 @@ class TwoParametersShrinkage(LinearShrinkage):
         - all covariances are the same
     """
 
-    def __init__(self, stop_precision: bool = True, assume_centered: bool = False) -> None:
-        super().__init__(stop_precision=stop_precision, assume_centered=assume_centered)
-        self._target: np.ndarray | None = None
+    def __init__(self, store_precision: bool = True, assume_centered: bool = False) -> None:
+        super().__init__(store_precision=store_precision, assume_centered=assume_centered)
+        self._target: np.ndarray | float = 0.0
 
     def _fit(self, X: np.ndarray) -> np.ndarray:
         n_samples, n_features = X.shape
 
-        if not self._assume_centered:
+        if not self.assume_centered:
             n_samples -= 1
 
         sample = np.dot(X.T, X) / n_samples
